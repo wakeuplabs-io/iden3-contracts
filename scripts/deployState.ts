@@ -6,8 +6,8 @@ const pathOutputJson = path.join(__dirname, "./deploy_state_output.json");
 async function main() {
   const deployHelper = await DeployHelper.initialize(null, true);
 
-  const { state, verifier, stateLib, smtLib, poseidon1, poseidon2, poseidon3 } =
-    await deployHelper.deployState([], 'VerifierStateTransition', 'create2');
+  const { state, verifier, stateLib, smtLib, poseidon1, poseidon2, poseidon3, defaultIdType } =
+    await deployHelper.deployState([], "VerifierStateTransition", "create2");
 
   const outputJson = {
     state: await state.getAddress(),
@@ -18,6 +18,7 @@ async function main() {
     poseidon2: await poseidon2.getAddress(),
     poseidon3: await poseidon3.getAddress(),
     network: process.env.HARDHAT_NETWORK,
+    defaultIdType,
   };
   fs.writeFileSync(pathOutputJson, JSON.stringify(outputJson, null, 1));
 }

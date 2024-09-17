@@ -9,4 +9,6 @@ export const chainIdDefaultIdTypeMap = new Map()
   .set(59141, "0x0148") // linea-sepolia
   .set(59144, "0x0149") // linea-main
   .set(21000, "0x01A1") // privado-main
-  .set(21001, "0x01A2"); // privado-test
+  .set(21001, "0x01A2") // privado-test
+  .set(10, "0x0381") // optimism main
+  .set(11155420, "0x0382"); // optimism sepolia
