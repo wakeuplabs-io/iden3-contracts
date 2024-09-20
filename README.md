@@ -83,6 +83,27 @@ cd contracts
 npm publish
 ```
 
+## Add new chains and methods
+
+Compute didType with:
+
+```ts
+  core.registerDidMethod('opid', 0b00000011);
+  core.registerDidMethodNetwork({
+    method: 'opid',
+    blockchain: 'optimism',
+    chainId: 10,
+    network: 'main',
+    networkFlag: 0b1000_0000 | 0b0000_0001
+  });
+
+  const mainDidType = core.buildDIDType('opid', 'optimism', 'main');
+  const mainDidHex = mainDidType.map((num) => num.toString(16));
+  console.log('main did type:', mainDidHex);
+```
+
+And add it in `./helpers/ChainIdDefTypeMap.ts`
+
 ## License
 
 This repository is part of the iden3 project copyright 2023 0KIMS Association and published under GPL-3.0 license. Please check the LICENSE file for more details.

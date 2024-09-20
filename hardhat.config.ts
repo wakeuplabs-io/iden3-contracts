@@ -114,14 +114,19 @@ const config: HardhatUserConfig = {
     //     },
     //   },
     // },
-    localhost: {
-      url: "http://127.0.0.1:8545",
-      accounts: {
-        mnemonic: DEFAULT_MNEMONIC,
-        path: "m/44'/60'/0'/0",
-        initialIndex: 0,
-        count: 20,
-      },
+    // localhost: {
+    //   url: "http://127.0.0.1:8545",
+    //   accounts: {
+    //     mnemonic: DEFAULT_MNEMONIC,
+    //     path: "m/44'/60'/0'/0",
+    //     initialIndex: 0,
+    //     count: 20,
+    //   },
+    // },
+    "opt-sepolia": {
+      chainId: 11155420,
+      url: `https://opt-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+      accounts: [`0x${process.env.OPTIMISM_SEPOLIA_PRIVATE_KEY}`],
     },
   },
   gasReporter: {
