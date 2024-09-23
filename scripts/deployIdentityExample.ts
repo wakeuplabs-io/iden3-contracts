@@ -2,23 +2,24 @@ import fs from "fs";
 import path from "path";
 import { OnchainIdentityDeployHelper } from "../helpers/OnchainIdentityDeployHelper";
 import { DeployHelper } from "../helpers/DeployHelper";
+
 const pathOutputJson = path.join(__dirname, "./deploy_state_output.json");
 
 async function main() {
-    const stDeployHelper = await DeployHelper.initialize();
-    const deployHelper = await OnchainIdentityDeployHelper.initialize();
-    const stContracts = await stDeployHelper.deployState();
-    const contracts = await deployHelper.deployIdentity(
-      stContracts.state,
-      stContracts.smtLib,
-      stContracts.poseidon1,
-      stContracts.poseidon2,
-      stContracts.poseidon3,
-      stContracts.poseidon4,
-      stContracts.defaultIdType);
+  const stDeployHelper = await DeployHelper.initialize();
+  const deployHelper = await OnchainIdentityDeployHelper.initialize();
+  const stContracts = await stDeployHelper.deployState();
+  const contracts = await deployHelper.deployIdentity(
+    stContracts.state,
+    stContracts.smtLib,
+    stContracts.poseidon1,
+    stContracts.poseidon2,
+    stContracts.poseidon3,
+    stContracts.poseidon4,
+    stContracts.defaultIdType,
+  );
 
-    const identity = contracts.identity;
-
+  const identity = contracts.identity;
 
   const outputJson = {
     state: await stContracts.state.getAddress(),

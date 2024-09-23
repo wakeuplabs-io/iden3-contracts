@@ -1,14 +1,22 @@
+import path from "path";
 import { DeployHelper } from "../helpers/DeployHelper";
+
+const pathStateOutputJson = path.join(__dirname, "./deploy_state_output.json");
 
 (async () => {
   const deployHelper = await DeployHelper.initialize();
 
-  const stateContractAddress = process.env.STATE_CONTRACT_ADDRESS || "";
-  const poseidon2ContractAddress = process.env.POSEIDON_2_CONTRACT_ADDRESS || "";
-  const poseidon3ContractAddress = process.env.POSEIDON_3_CONTRACT_ADDRESS || "";
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const stateDeployment = require(pathStateOutputJson);
 
-  await deployHelper.deployIdentityTreeStore(stateContractAddress,
+  const stateContractAddress = stateDeployment.state ?? "";
+  const poseidon2ContractAddress = stateDeployment.poseidon2 ?? "";
+  const poseidon3ContractAddress = stateDeployment.poseidon3 ?? "";
+
+  await deployHelper.deployIdentityTreeStore(
+    stateContractAddress,
     poseidon2ContractAddress,
     poseidon3ContractAddress,
-    'create2');
+    "create2",
+  );
 })();

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
-import {DeployHelper} from "../helpers/DeployHelper";
-import {deployPoseidonFacade} from "../helpers/PoseidonDeployHelper";
+import { DeployHelper } from "../helpers/DeployHelper";
+import { deployPoseidonFacade } from "../helpers/PoseidonDeployHelper";
 
 async function main() {
   const deployHelper = await DeployHelper.initialize(null, true);
@@ -22,7 +22,10 @@ async function main() {
     info: deployInfo,
     network: process.env.HARDHAT_NETWORK,
   };
-  const pathOutputJson = path.join(__dirname, "./deploy_poseidon_" + process.env.HARDHAT_NETWORK + ".json");
+  const pathOutputJson = path.join(
+    __dirname,
+    "./deploy_poseidon_" + process.env.HARDHAT_NETWORK + ".json",
+  );
   fs.writeFileSync(pathOutputJson, JSON.stringify(outputJson, null, 1));
 }
 

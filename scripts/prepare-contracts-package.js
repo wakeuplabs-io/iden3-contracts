@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 const util = require("util");
 const exec = util.promisify(require("child_process").exec);
 
@@ -34,7 +35,7 @@ async function preparePackage() {
   for (const command of commands) {
     console.log(`Running: ${command.name}`);
     const { stdout, stderr } = await exec(command.command);
-    console.log(command.command)
+    console.log(command.command);
     stdout && console.log("stdout:", stdout);
     stderr && console.log("stderr:", stderr);
   }

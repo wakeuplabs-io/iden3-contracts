@@ -1,11 +1,10 @@
-const path = require("path");
+/* eslint-disable @typescript-eslint/no-var-requires */
 const hre = require("hardhat");
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
 
 // const pathDeployOutputParameters = path.join(__dirname, "./deploy_state_output.json");
 // const deployOutputParameters = require(pathDeployOutputParameters);
 
+// TODO: prepare for optimism
 const openzeppelinUpgrade = require(`../.openzeppelin/polygon-${process.env.HARDHAT_NETWORK}.json`);
 
 async function main() {
@@ -25,9 +24,9 @@ async function main() {
   for (const property in openzeppelinUpgrade.impls) {
     const address = openzeppelinUpgrade.impls[property].address;
     try {
-      await hre.run("verify:verify",{address});
+      await hre.run("verify:verify", { address });
     } catch (error) {
-      console.log(error.message)
+      console.log(error.message);
       //expect(error.message.toLowerCase().includes("already verified")).to.be.equal(true);
     }
   }
@@ -39,4 +38,3 @@ main()
     console.error(error);
     process.exit(1);
   });
-

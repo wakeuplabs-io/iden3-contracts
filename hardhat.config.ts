@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { HardhatUserConfig, task } from "hardhat/config";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
@@ -34,46 +35,16 @@ const config: HardhatUserConfig = {
     ],
   },
   networks: {
-    // polygon: {
-    //   chainId: 137,
-    //   url: `${process.env.POLYGON_RPC_URL}`,
-    //   accounts: [`0x${process.env.POLYGON_PRIVATE_KEY}`],
-    // },
-    // mumbai: {
-    //   chainId: 80001,
-    //   url: `${process.env.MUMBAI_RPC_URL}`,
-    //   accounts: [`0x${process.env.MUMBAI_PRIVATE_KEY}`],
-    // },
-    // 'privado-main': {
-    //   chainId: 21000,
-    //   url: `${process.env.PRIVADO_MAIN_RPC_URL}`,
-    //   accounts: [`0x${process.env.PRIVADO_MAIN_PRIVATE_KEY}`],
-    // },
-    // 'privado-test': {
-    //   chainId: 21001,
-    //   url: `${process.env.PRIVADO_TEST_RPC_URL}`,
-    //   accounts: [`0x${process.env.PRIVADO_TEST_PRIVATE_KEY}`],
-    // },
-    // amoy: {
-    //   chainId: 80002,
-    //   url: `${process.env.AMOY_RPC_URL}`,
-    //   accounts: [`0x${process.env.AMOY_PRIVATE_KEY}`],
-    // },
-    // 'linea-sepolia': {
-    //   chainId: 59141,
-    //   url: `${process.env.SEPOLIA_RPC_URL}`,
-    //   accounts: [`0x${process.env.SEPOLIA_PRIVATE_KEY}`],
-    // },
-    // 'privado-main': {
-    //   chainId: 21000,
-    //   url: `${process.env.PRIVADO_MAIN_RPC_URL}`,
-    //   accounts: [`0x${process.env.PRIVADO_MAIN_PRIVATE_KEY}`],
-    // },
-    // 'privado-test': {
-    //   chainId: 21001,
-    //   url: `${process.env.PRIVADO_TEST_RPC_URL}`,
-    //   accounts: [`0x${process.env.PRIVADO_TEST_PRIVATE_KEY}`],
-    // },
+    opt: {
+      chainId: 10,
+      url: `https://opt-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+      accounts: [`0x${process.env.OPT_PRIVATE_KEY}`],
+    },
+    "opt-sepolia": {
+      chainId: 11155420,
+      url: `https://opt-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+      accounts: [`0x${process.env.OPT_SEPOLIA_PRIVATE_KEY}`],
+    },
     // hardhat: {
     //   forking: {
     //     url: `https://polygon-mumbai.infura.io/v3/${process.env.INFURA_API_KEY}`,
@@ -123,18 +94,12 @@ const config: HardhatUserConfig = {
     //     count: 20,
     //   },
     // },
-    "opt-sepolia": {
-      chainId: 11155420,
-      url: `https://opt-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-      accounts: [`0x${process.env.OPTIMISM_SEPOLIA_PRIVATE_KEY}`],
-    },
   },
   gasReporter: {
     currency: "USD",
     coinmarketcap: process.env.COINMARKETCAP_KEY,
     enabled: !!process.env.REPORT_GAS,
-    token: "MATIC",
-    gasPriceApi: "https://api.polygonscan.com/api?module=proxy&action=eth_gasPrice", // MATIC
+    token: "ETH",
     // gasPriceAPI: "https://api.etherscan.io/api?module=proxy&action=eth_gasPrice", // ETH
   },
 
@@ -151,29 +116,10 @@ const config: HardhatUserConfig = {
 
   etherscan: {
     apiKey: {
-      amoy: process.env.POLYGON_API_KEY || "",
-      polygon: process.env.POLYGON_API_KEY || "",
-      linea: process.env.LINEA_API_KEY || "",
-      "linea-sepolia": process.env.LINEA_API_KEY || "",
+      opt: process.env.OPTIMISM_API_KEY || "",
+      "opt-sepolia": process.env.OPTIMISM_API_KEY || "",
     },
-    customChains: [
-      {
-        network: "amoy",
-        chainId: 80002,
-        urls: {
-          apiURL: "https://api-amoy.polygonscan.com/api",
-          browserURL: "https://docs.polygonscan.com",
-        },
-      },
-      {
-        network: "linea-sepolia",
-        chainId: 59141,
-        urls: {
-          apiURL: "https://api-sepolia.lineascan.build/api",
-          browserURL: "https://sepolia.lineascan.build",
-        },
-      },
-    ],
+    customChains: [],
   },
 };
 
