@@ -9,7 +9,7 @@ async function main() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const stateAddress = require(pathStateOutputJson).state;
 
-  const validators: ("mtpV2" | "sigV2" | "v3")[] = ["v3"];
+  const validators: ("mtpV2" | "sigV2" | "v3")[] = ["sigV2"];
   const deployHelper = await DeployHelper.initialize(null, true);
 
   const deployInfo: any = [];

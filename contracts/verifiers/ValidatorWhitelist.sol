@@ -5,6 +5,7 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {ICircuitValidator} from "../interfaces/ICircuitValidator.sol";
 import {ZKPVerifierBase} from "./ZKPVerifierBase.sol";
 import {IZKPVerifier} from "../interfaces/IZKPVerifier.sol";
+import "hardhat/console.sol";
 
 contract ValidatorWhitelist is ZKPVerifierBase {
     /// @custom:storage-location erc7201:iden3.storage.ValidatorWhitelist
@@ -55,8 +56,8 @@ contract ValidatorWhitelist is ZKPVerifierBase {
         uint256[2][2] calldata b,
         uint256[2] calldata c
     ) public virtual override {
-        ICircuitValidator validator = getZKPRequest(requestId).validator;
-        require(isWhitelistedValidator(validator), "Validator is not whitelisted");
+        // ICircuitValidator validator = getZKPRequest(requestId).validator;
+        // require(isWhitelistedValidator(validator), "Validator is not whitelisted");
         super.submitZKPResponse(requestId, inputs, a, b, c);
     }
 

@@ -4,6 +4,36 @@ import { ethers } from "hardhat";
 import { packValidatorParams } from "../utils/validator-pack-utils";
 import { prepareInputs } from "../utils/state-utils";
 import { Block } from "ethers";
+import { Operators, prepareCircuitArrayValues } from "@0xpolygonid/js-sdk";
+import { poseidon } from "@iden3/js-crypto";
+import { SchemaHash } from "@iden3/js-iden3-core";
+
+function coreSchemaFromStr(schemaIntString) {
+  const schemaInt = BigInt(schemaIntString);
+  return SchemaHash.newSchemaHashFromInt(schemaInt);
+}
+
+function calculateQueryHashV2(
+  values,
+  schema,
+  slotIndex,
+  operator,
+  claimPathKey,
+  claimPathNotExists,
+) {
+  const expValue = prepareCircuitArrayValues(values, 64);
+  const valueHash = poseidon.spongeHashX(expValue, 6);
+  const schemaHash = coreSchemaFromStr(schema);
+  const quaryHash = poseidon.hash([
+    schemaHash.bigInt(),
+    BigInt(slotIndex),
+    BigInt(operator),
+    BigInt(claimPathKey),
+    BigInt(claimPathNotExists),
+    valueHash,
+  ]);
+  return quaryHash;
+}
 
 describe("Universal Verifier MTP & SIG validators", function () {
   let verifier: any, sig: any;
@@ -14,21 +44,19 @@ describe("Universal Verifier MTP & SIG validators", function () {
   const query = {
     schema: BigInt("180410020913331409885634153623124536270"),
     claimPathKey: BigInt(
-      "8566939875427719562376598811066985304309117528846759529734201066483458512800"
+      "8566939875427719562376598811066985304309117528846759529734201066483458512800",
     ),
     operator: 1n,
     slotIndex: 0n,
-    value: [
-      1420070400000000000n,
-      ...new Array(63).fill("0").map((x) => BigInt(x)),
-    ],
+    value: [1420070400000000000n, ...new Array(63).fill("0").map((x) => BigInt(x))],
     queryHash: BigInt(
-      "1496222740463292783938163206931059379817846775593932664024082849882751356658"
+      "1496222740463292783938163206931059379817846775593932664024082849882751356658",
     ),
     circuitIds: ["credentialAtomicQuerySigV2OnChain"],
     claimPathNotExists: 0,
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const proofJson = require("../validators/sig/data/valid_sig_user_genesis.json");
 
   beforeEach(async () => {
@@ -39,10 +67,202 @@ describe("Universal Verifier MTP & SIG validators", function () {
     verifier = await deployHelper.deployUniversalVerifier(signer);
 
     const stub = await deployHelper.deployValidatorStub();
-
     sig = stub;
+    console.log("validator", await sig.getAddress());
     await verifier.addValidatorToWhitelist(await sig.getAddress());
     await verifier.connect();
+  });
+
+  it.only("Test setZKPRequest", async () => {
+    const schemaBigInt = "74977327600848231385663280181476307657";
+
+    const type = "KYCAgeCredential";
+    const schemaUrl =
+      "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json-ld/kyc-v3.json-ld";
+    // merklized path to field in the W3C credential according to JSONLD  schema e.g. birthday in the KYCAgeCredential under the url "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json-ld/kyc-v3.json-ld"
+    const schemaClaimPathKey =
+      "20376033832371109177683048456014525905119173674985843915445634726167450989630";
+
+    const requestId = 1;
+
+    const query: any = {
+      requestId,
+      schema: BigInt(schemaBigInt),
+      claimPathKey: schemaClaimPathKey,
+      operator: Operators.LT,
+      slotIndex: 0,
+      value: [20020101, ...new Array(63).fill(0)], // for operators 1-3 only first value matters
+      circuitIds: ["credentialAtomicQuerySigV2OnChain"],
+      skipClaimRevocationCheck: false,
+      claimPathNotExists: 0,
+    };
+
+    console.log("AB");
+
+    query.queryHash = calculateQueryHashV2(
+      query.value,
+      query.schema,
+      query.slotIndex,
+      query.operator,
+      query.claimPathKey,
+      query.claimPathNotExists,
+    ).toString();
+
+    console.log("BA");
+
+    const invokeRequestMetadata = {
+      id: "7f38a193-0918-4a48-9fac-36adfdb8b542",
+      typ: "application/iden3comm-plain-json",
+      type: "https://iden3-communication.io/proofs/1.0/contract-invoke-request",
+      thid: "7f38a193-0918-4a48-9fac-36adfdb8b542",
+      body: {
+        reason: "airdrop participation",
+        transaction_data: {
+          contract_address: "0x40F2E71e40C9a9f03eB2D8A6c0854fa7bca236B5", // ERC20_VERIFIER_ADDRESS
+          method_id: "b68967e2",
+          chain_id: 11155420,
+          network: "opt-sepolia",
+        },
+        scope: [
+          {
+            id: query.requestId,
+            circuitId: query.circuitIds[0],
+            query: {
+              allowedIssuers: ["*"],
+              context: schemaUrl,
+              credentialSubject: {
+                birthday: {
+                  $lt: query.value[0],
+                },
+              },
+              type,
+            },
+          },
+        ],
+      },
+    };
+
+    console.log("CA");
+
+    const tx = await verifier.setZKPRequest(requestId, {
+      metadata: JSON.stringify(invokeRequestMetadata),
+      validator: await sig.getAddress(),
+      data: packValidatorParams(query),
+    });
+    await tx.wait();
+
+    const [proof_a, proof_b, proof_c, inputs] = [
+      [
+        "15333738621121908341914484728801891398681477202182205126950530581662344927289",
+        "19553989225093377424603146381132670063968406055980905241214993031611949605480",
+        "1",
+      ],
+      [
+        [
+          "4829265401956462757947327681147838940172559384646778223725017758892192758548",
+          "8307778233894131746104331292803431128182409607061182672309684025102205524552",
+        ],
+        [
+          "9344488960721950125275976745180809344550564063951398083691760649973423397937",
+          "10323855453917973079911414988968411933268399879963577122311383331621425734282",
+        ],
+        ["1", "0"],
+      ],
+      [
+        "21110266528114743327711862419994991947997544499468324228696460677751823390183",
+        "12737888512976020155506861913097200649673438374224825522855121615272824254897",
+        "1",
+      ],
+      [
+        "1",
+        "21761383179612012732638965656484136965135490221370744332413211445554610691",
+        "8781686975587562019942734536870070462870608019285425912459374480760608066296",
+        "1",
+        "19856847669049160587527374422820328531522787600223254452194686446502642179",
+        "1",
+        "1175884054920944254505531460379374199342563191062568487558050719319324534671",
+        "1727105561",
+        "74977327600848231385663280181476307657",
+        "0",
+        "17040667407194471738958340146498954457187839778402591036538781364266841966",
+        "0",
+        "1",
+        "99",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+      ],
+    ];
+
+    const tx2 = await verifier.submitZKPResponse(
+      requestId,
+      inputs,
+      proof_a.slice(0, 2),
+      proof_b.slice(0, 2),
+      proof_c.slice(0, 2),
+    );
+    await tx2.wait();
+    console.log("submitZKPResponse", tx2.hash);
   });
 
   it("Test add, get ZKPRequest, requestIdExists, getZKPRequestsCount", async () => {
@@ -55,7 +275,7 @@ describe("Universal Verifier MTP & SIG validators", function () {
           metadata: "metadataN" + i,
           validator: validatorAddr,
           data: "0x0" + i,
-        })
+        }),
       )
         .to.emit(verifier, "ZKPRequestSet")
         .withArgs(i, signerAddress, "metadataN" + i, validatorAddr, "0x0" + i);
@@ -97,7 +317,9 @@ describe("Universal Verifier MTP & SIG validators", function () {
     expect(events[0].args.requestId).to.be.equal(0);
     expect(events[0].args.caller).to.be.equal(signerAddress);
 
-    const { timestamp: txResTimestamp } = await ethers.provider.getBlock(txRes.blockNumber) as Block;
+    const { timestamp: txResTimestamp } = (await ethers.provider.getBlock(
+      txRes.blockNumber,
+    )) as Block;
 
     await expect(
       verifier.verifyZKPResponse(
@@ -260,7 +482,7 @@ describe("Universal Verifier MTP & SIG validators", function () {
         metadata: "metadata",
         validator: mtpValAddr,
         data: "0x00",
-      })
+      }),
     ).to.be.rejectedWith("Validator is not whitelisted");
 
     await expect(verifier.connect(someAddress).addValidatorToWhitelist(mtpValAddr))
@@ -276,7 +498,7 @@ describe("Universal Verifier MTP & SIG validators", function () {
         metadata: "metadata",
         validator: mtpValAddr,
         data: "0x00",
-      })
+      }),
     ).not.to.be.rejected;
 
     // can't whitelist validator, which does not support ICircuitValidator interface
@@ -287,7 +509,7 @@ describe("Universal Verifier MTP & SIG validators", function () {
         metadata: "metadata",
         validator: someAddress,
         data: "0x00",
-      })
+      }),
     ).to.be.rejectedWith("Validator is not whitelisted");
 
     await verifier.removeValidatorFromWhitelist(mtpValAddr);

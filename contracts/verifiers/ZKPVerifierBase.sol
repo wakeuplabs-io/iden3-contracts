@@ -5,6 +5,7 @@ import {IZKPVerifier} from "../interfaces/IZKPVerifier.sol";
 import {ICircuitValidator} from "../interfaces/ICircuitValidator.sol";
 import {ArrayUtils} from "../lib/ArrayUtils.sol";
 import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "hardhat/console.sol";
 
 abstract contract ZKPVerifierBase is IZKPVerifier, ContextUpgradeable {
     /// @dev Struct to store ZKP proof and associated data
@@ -68,6 +69,7 @@ abstract contract ZKPVerifierBase is IZKPVerifier, ContextUpgradeable {
         uint64 requestId,
         IZKPVerifier.ZKPRequest calldata request
     ) public virtual checkRequestExistence(requestId, false) {
+        // console.log("storeRequest", requestId, request);
         ZKPVerifierStorage storage s = _getZKPVerifierStorage();
         s._requests[requestId] = request;
         s._requestIds.push(requestId);

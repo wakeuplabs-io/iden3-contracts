@@ -1,0 +1,5 @@
+{
+ "verifierName": "ERC20LinkedUniversalVerifier",
+ "verifierSymbol": "zkERC20",
+ "ERC20Verifier": "0x88AAf44781b60ccbC58f724C9aEC3f0730ab7517"
+}
