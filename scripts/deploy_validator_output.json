@@ -2,9 +2,8 @@
  "info": [
   {
    "validatorType": "sigV2",
-   "validator": "0xcb031049947930Ed89788fDDc55512ea96Cea9f4",
+   "validator": "0xfA9c7E0c48aeed2e6cFd0a8728D7cBcF50743ba2",
    "verifier": "0x348FcCc653d6A104A19c33fe2444AfCe7461BEBE"
   }
- ],
- "network": "opt-sepolia"
+ ]
 }

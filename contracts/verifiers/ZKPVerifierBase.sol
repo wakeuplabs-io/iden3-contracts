@@ -5,7 +5,6 @@ import {IZKPVerifier} from "../interfaces/IZKPVerifier.sol";
 import {ICircuitValidator} from "../interfaces/ICircuitValidator.sol";
 import {ArrayUtils} from "../lib/ArrayUtils.sol";
 import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-import "hardhat/console.sol";
 
 abstract contract ZKPVerifierBase is IZKPVerifier, ContextUpgradeable {
     /// @dev Struct to store ZKP proof and associated data

@@ -9,6 +9,8 @@ import {RequestDisableable} from "./RequestDisableable.sol";
 import {ValidatorWhitelist} from "./ValidatorWhitelist.sol";
 import {ZKPVerifierBase} from "./ZKPVerifierBase.sol";
 import {ArrayUtils} from "../lib/ArrayUtils.sol";
+import {PrimitiveTypeUtils} from "../lib/PrimitiveTypeUtils.sol";
+import "hardhat/console.sol";
 
 /// @title Universal Verifier Contract
 /// @notice A contract to manage ZKP (Zero-Knowledge Proof) requests and proofs.
@@ -53,6 +55,13 @@ contract UniversalVerifier is
     /// @dev Version of contract getter
     function version() public pure returns (string memory) {
         return VERSION;
+    }
+
+    function getChallenge(address sender) public returns (uint256) {
+        uint256 challenge = PrimitiveTypeUtils.addressToUint256LE(sender);
+        require(PrimitiveTypeUtils.uint256LEToAddress(challenge) == sender, "Challenge should match the sender");
+        console.log("challenge", uint256(challenge));
+        return challenge;
     }
 
     /// @dev Sets a ZKP request

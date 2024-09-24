@@ -3,11 +3,9 @@ import path from "path";
 import { DeployHelper } from "../helpers/DeployHelper";
 
 const pathOutputJson = path.join(__dirname, "./deploy_validator_output.json");
-const pathStateOutputJson = path.join(__dirname, "./deploy_state_output.json");
 
 async function main() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const stateAddress = require(pathStateOutputJson).state;
+  const stateAddress = "0x9a1A258702050BcFB938Ad8Ec0996503473216d1";
 
   const validators: ("mtpV2" | "sigV2" | "v3")[] = ["sigV2"];
   const deployHelper = await DeployHelper.initialize(null, true);

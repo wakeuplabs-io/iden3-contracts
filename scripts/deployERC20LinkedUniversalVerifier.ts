@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 
 // opt-sepolia
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const universalVerifierAddress = "0xf88552AEe625c290505036Da15FfCfC459BA41cA";
+const universalVerifierAddress = "0x102eB31F9f2797e8A84a79c01FFd9aF7D1d9e556";
 
 const pathOutputJson = path.join(__dirname, "./deploy_ERC20LinkedUniversalVerifier_output.json");
 

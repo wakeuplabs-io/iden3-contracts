@@ -4,9 +4,66 @@ import { ethers } from "hardhat";
 import { packValidatorParams } from "../utils/validator-pack-utils";
 import { prepareInputs } from "../utils/state-utils";
 import { Block } from "ethers";
-import { Operators, prepareCircuitArrayValues } from "@0xpolygonid/js-sdk";
+import {
+  AbstractPrivateKeyStore,
+  AgentResolver,
+  BjjProvider,
+  core,
+  CredentialRequest,
+  CredentialStatusPublisherRegistry,
+  CredentialStatusResolverRegistry,
+  CredentialStatusType,
+  CredentialStorage,
+  CredentialWallet,
+  defaultEthConnectionConfig,
+  EthConnectionConfig,
+  EthStateStorage,
+  FSCircuitStorage,
+  ICircuitStorage,
+  ICredentialWallet,
+  IDataStorage,
+  Iden3SmtRhsCredentialStatusPublisher,
+  Identity,
+  IdentityCreationOptions,
+  IdentityStorage,
+  IdentityWallet,
+  IIdentityWallet,
+  InMemoryDataSource,
+  InMemoryMerkleTreeStorage,
+  InMemoryPrivateKeyStore,
+  IssuerResolver,
+  IStateStorage,
+  KMS,
+  KmsKeyType,
+  OnChainResolver,
+  Operators,
+  prepareCircuitArrayValues,
+  Profile,
+  ProofService,
+  RHSResolver,
+  W3CCredential,
+} from "@0xpolygonid/js-sdk";
 import { poseidon } from "@iden3/js-crypto";
 import { SchemaHash } from "@iden3/js-iden3-core";
+import path from "path";
+
+// const OPID_METHOD = "opid";
+
+// core.registerDidMethod(OPID_METHOD, 0b00000011);
+// core.registerDidMethodNetwork({
+//   method: OPID_METHOD,
+//   blockchain: "optimism",
+//   chainId: 31337,
+//   network: "sepolia",
+//   networkFlag: 0b1000_0000 | 0b0000_0010,
+// });
+// core.registerDidMethodNetwork({
+//   method: OPID_METHOD,
+//   blockchain: "optimism",
+//   chainId: 10,
+//   network: "main",
+//   networkFlag: 0b1000_0000 | 0b0000_0001,
+// });
 
 function coreSchemaFromStr(schemaIntString) {
   const schemaInt = BigInt(schemaIntString);
@@ -35,8 +92,86 @@ function calculateQueryHashV2(
   return quaryHash;
 }
 
+async function setZKPRequest(
+  verifier: any,
+  validator: any,
+  requestId: number,
+  erc20VerifierAddress: string,
+) {
+  const schemaBigInt = "74977327600848231385663280181476307657";
+
+  const type = "KYCAgeCredential";
+  const schemaUrl =
+    "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json-ld/kyc-v3.json-ld";
+  // merklized path to field in the W3C credential according to JSONLD  schema e.g. birthday in the KYCAgeCredential under the url "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json-ld/kyc-v3.json-ld"
+  const schemaClaimPathKey =
+    "20376033832371109177683048456014525905119173674985843915445634726167450989630";
+
+  const query: any = {
+    requestId,
+    schema: BigInt(schemaBigInt),
+    claimPathKey: schemaClaimPathKey,
+    operator: Operators.LT,
+    slotIndex: 0,
+    value: [20020101, ...new Array(63).fill(0)], // for operators 1-3 only first value matters
+    circuitIds: ["credentialAtomicQuerySigV2OnChain"],
+    skipClaimRevocationCheck: false,
+    claimPathNotExists: 0,
+  };
+
+  query.queryHash = calculateQueryHashV2(
+    query.value,
+    query.schema,
+    query.slotIndex,
+    query.operator,
+    query.claimPathKey,
+    query.claimPathNotExists,
+  ).toString();
+
+  const invokeRequestMetadata = {
+    id: "7f38a193-0918-4a48-9fac-36adfdb8b542",
+    typ: "application/iden3comm-plain-json",
+    type: "https://iden3-communication.io/proofs/1.0/contract-invoke-request",
+    thid: "7f38a193-0918-4a48-9fac-36adfdb8b542",
+    body: {
+      reason: "airdrop participation",
+      transaction_data: {
+        contract_address: erc20VerifierAddress,
+        method_id: "b68967e2",
+        chain_id: 11155420,
+        network: "opt-sepolia",
+      },
+      scope: [
+        {
+          id: query.requestId,
+          circuitId: query.circuitIds[0],
+          query: {
+            allowedIssuers: ["*"],
+            context: schemaUrl,
+            credentialSubject: {
+              birthday: {
+                $lt: query.value[0],
+              },
+            },
+            type,
+          },
+        },
+      ],
+    },
+  };
+
+  const tx = await verifier.setZKPRequest(requestId, {
+    metadata: JSON.stringify(invokeRequestMetadata),
+    validator: await validator.getAddress(),
+    data: packValidatorParams(query),
+  });
+  await tx.wait();
+
+  return { query };
+}
+
 describe("Universal Verifier MTP & SIG validators", function () {
-  let verifier: any, sig: any;
+  let verifier: any, sig: any, state: any;
   let signer, signer2, signer3;
   let signerAddress: string;
   let deployHelper: DeployHelper;
@@ -63,204 +198,119 @@ describe("Universal Verifier MTP & SIG validators", function () {
     [signer, signer2, signer3] = await ethers.getSigners();
     signerAddress = await signer.getAddress();
 
-    deployHelper = await DeployHelper.initialize(null, true);
+    deployHelper = await DeployHelper.initialize(null, false);
     verifier = await deployHelper.deployUniversalVerifier(signer);
 
-    const stub = await deployHelper.deployValidatorStub();
-    sig = stub;
+    ({ state } = await await deployHelper.deployState([], "VerifierStateTransition", "create2"));
+    const stub = await deployHelper.deployValidatorContracts("sigV2", await state.getAddress());
+    sig = stub.validator;
+    console.log("verifierWrapper", await stub.verifierWrapper.getAddress());
     console.log("validator", await sig.getAddress());
     await verifier.addValidatorToWhitelist(await sig.getAddress());
     await verifier.connect();
   });
 
-  it.only("Test setZKPRequest", async () => {
-    const schemaBigInt = "74977327600848231385663280181476307657";
+  it.only("Test aaaa", async () => {
+    console.log(await verifier.getChallenge("0xF754D0f4de0e815b391D997Eeec5cD07E59858F0"));
+  });
 
-    const type = "KYCAgeCredential";
-    const schemaUrl =
-      "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json-ld/kyc-v3.json-ld";
-    // merklized path to field in the W3C credential according to JSONLD  schema e.g. birthday in the KYCAgeCredential under the url "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json-ld/kyc-v3.json-ld"
-    const schemaClaimPathKey =
-      "20376033832371109177683048456014525905119173674985843915445634726167450989630";
-
-    const requestId = 1;
-
-    const query: any = {
+  it("Test setZKPRequest", async () => {
+    const requestId = 0;
+    const { query } = await setZKPRequest(
+      verifier,
+      sig,
       requestId,
-      schema: BigInt(schemaBigInt),
-      claimPathKey: schemaClaimPathKey,
-      operator: Operators.LT,
-      slotIndex: 0,
-      value: [20020101, ...new Array(63).fill(0)], // for operators 1-3 only first value matters
-      circuitIds: ["credentialAtomicQuerySigV2OnChain"],
-      skipClaimRevocationCheck: false,
-      claimPathNotExists: 0,
+      "0x177328000994fBF302C0E20c7C493Cc0C7892927",
+    );
+
+    console.log("SET", query);
+
+    // const { inputs, pi_a, pi_b, pi_c } = prepareInputs(proof);
+    // const tx2 = await verifier.submitZKPResponse(0, inputs, pi_a, pi_b, pi_c);
+    // await tx2.wait();
+    // console.log("submitZKPResponse", tx2.hash);
+  });
+
+  it("Test setZKPRequest", async () => {
+    const requestId = 0;
+
+    const { query } = await setZKPRequest(verifier, sig, requestId, "");
+
+    console.log("SET");
+
+    const defaultNetworkConnection = {
+      rpcUrl: "http://127.0.0.1:8545",
+      contractAddress: await state.getAddress(),
     };
 
-    console.log("AB");
-
-    query.queryHash = calculateQueryHashV2(
-      query.value,
-      query.schema,
-      query.slotIndex,
-      query.operator,
-      query.claimPathKey,
-      query.claimPathNotExists,
-    ).toString();
-
-    console.log("BA");
-
-    const invokeRequestMetadata = {
-      id: "7f38a193-0918-4a48-9fac-36adfdb8b542",
-      typ: "application/iden3comm-plain-json",
-      type: "https://iden3-communication.io/proofs/1.0/contract-invoke-request",
-      thid: "7f38a193-0918-4a48-9fac-36adfdb8b542",
-      body: {
-        reason: "airdrop participation",
-        transaction_data: {
-          contract_address: "0x40F2E71e40C9a9f03eB2D8A6c0854fa7bca236B5", // ERC20_VERIFIER_ADDRESS
-          method_id: "b68967e2",
-          chain_id: 11155420,
-          network: "opt-sepolia",
-        },
-        scope: [
-          {
-            id: query.requestId,
-            circuitId: query.circuitIds[0],
-            query: {
-              allowedIssuers: ["*"],
-              context: schemaUrl,
-              credentialSubject: {
-                birthday: {
-                  $lt: query.value[0],
-                },
-              },
-              type,
-            },
-          },
-        ],
+    const defaultIdentityCreationOptions: IdentityCreationOptions = {
+      method: "iden3",
+      blockchain: "eth",
+      networkId: "sepolia",
+      revocationOpts: {
+        type: CredentialStatusType.Iden3ReverseSparseMerkleTreeProof,
+        id: "https://rhs-staging.polygonid.me",
       },
     };
 
-    console.log("CA");
+    const { dataStorage, credentialWallet, identityWallet } =
+      await initInMemoryDataStorageAndWallets(defaultNetworkConnection);
 
-    const tx = await verifier.setZKPRequest(requestId, {
-      metadata: JSON.stringify(invokeRequestMetadata),
-      validator: await sig.getAddress(),
-      data: packValidatorParams(query),
-    });
-    await tx.wait();
-
-    const [proof_a, proof_b, proof_c, inputs] = [
-      [
-        "15333738621121908341914484728801891398681477202182205126950530581662344927289",
-        "19553989225093377424603146381132670063968406055980905241214993031611949605480",
-        "1",
-      ],
-      [
-        [
-          "4829265401956462757947327681147838940172559384646778223725017758892192758548",
-          "8307778233894131746104331292803431128182409607061182672309684025102205524552",
-        ],
-        [
-          "9344488960721950125275976745180809344550564063951398083691760649973423397937",
-          "10323855453917973079911414988968411933268399879963577122311383331621425734282",
-        ],
-        ["1", "0"],
-      ],
-      [
-        "21110266528114743327711862419994991947997544499468324228696460677751823390183",
-        "12737888512976020155506861913097200649673438374224825522855121615272824254897",
-        "1",
-      ],
-      [
-        "1",
-        "21761383179612012732638965656484136965135490221370744332413211445554610691",
-        "8781686975587562019942734536870070462870608019285425912459374480760608066296",
-        "1",
-        "19856847669049160587527374422820328531522787600223254452194686446502642179",
-        "1",
-        "1175884054920944254505531460379374199342563191062568487558050719319324534671",
-        "1727105561",
-        "74977327600848231385663280181476307657",
-        "0",
-        "17040667407194471738958340146498954457187839778402591036538781364266841966",
-        "0",
-        "1",
-        "99",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
-      ],
-    ];
-
-    const tx2 = await verifier.submitZKPResponse(
-      requestId,
-      inputs,
-      proof_a.slice(0, 2),
-      proof_b.slice(0, 2),
-      proof_c.slice(0, 2),
+    const circuitStorage = await initCircuitStorage();
+    const proofService = await initProofService(
+      identityWallet,
+      credentialWallet,
+      dataStorage.states,
+      circuitStorage,
     );
+
+    console.log("init done");
+
+    const { did: userDID } = await identityWallet.createIdentity({
+      ...defaultIdentityCreationOptions,
+    });
+
+    console.log("=============== user did ===============");
+    console.log(userDID.string());
+
+    const { did: issuerDID } = await identityWallet.createIdentity({
+      ...defaultIdentityCreationOptions,
+    });
+
+    const credentialRequest = createKYCAgeCredential(userDID);
+    const credential = await identityWallet.issueCredential(issuerDID, credentialRequest);
+
+    await dataStorage.credential.saveCredential(credential);
+
+    console.log("================= generate Iden3SparseMerkleTreeProof =======================");
+
+    const res = await identityWallet.addCredentialsToMerkleTree([credential], issuerDID);
+
+    console.log("================= publish to blockchain ===================");
+
+    const ethSigner = (await ethers.getSigners())[0];
+    const txId = await proofService.transitState(
+      issuerDID,
+      res.oldTreeState,
+      true,
+      dataStorage.states,
+      ethSigner,
+    );
+    console.log(txId);
+
+    console.log("================= generate credentialAtomicSigV2OnChain ===================");
+
+    const proof = await proofService.generateProof(
+      {
+        id: requestId,
+        circuitId: "credentialAtomicQuerySigV2OnChain",
+        query: query,
+      },
+      userDID,
+    );
+
+    const { inputs, pi_a, pi_b, pi_c } = prepareInputs(proof);
+    const tx2 = await verifier.submitZKPResponse(0, inputs, pi_a, pi_b, pi_c);
     await tx2.wait();
     console.log("submitZKPResponse", tx2.hash);
   });
@@ -528,3 +578,121 @@ describe("Universal Verifier MTP & SIG validators", function () {
     ).to.be.rejectedWith("Validator is not whitelisted");
   });
 });
+
+export async function initInMemoryDataStorageAndWallets(config: {
+  contractAddress: string;
+  rpcUrl: string;
+}) {
+  const dataStorage = initInMemoryDataStorage(config);
+  const credentialWallet = await initCredentialWallet(dataStorage);
+  const memoryKeyStore = new InMemoryPrivateKeyStore();
+
+  const identityWallet = await initIdentityWallet(dataStorage, credentialWallet, memoryKeyStore);
+
+  return {
+    dataStorage,
+    credentialWallet,
+    identityWallet,
+  };
+}
+
+export function initInMemoryDataStorage({
+  contractAddress,
+  rpcUrl,
+}: {
+  contractAddress: string;
+  rpcUrl: string;
+}): IDataStorage {
+  const conf: EthConnectionConfig = defaultEthConnectionConfig;
+  conf.contractAddress = contractAddress;
+  conf.url = rpcUrl;
+
+  // change here priority fees in case transaction is stuck or processing too long
+  // conf.maxPriorityFeePerGas = '250000000000' - 250 gwei
+  // conf.maxFeePerGas = '250000000000' - 250 gwei
+
+  const dataStorage = {
+    credential: new CredentialStorage(new InMemoryDataSource<W3CCredential>()),
+    identity: new IdentityStorage(
+      new InMemoryDataSource<Identity>(),
+      new InMemoryDataSource<Profile>(),
+    ),
+    mt: new InMemoryMerkleTreeStorage(40),
+
+    states: new EthStateStorage(defaultEthConnectionConfig),
+  };
+
+  return dataStorage;
+}
+
+export async function initCredentialWallet(dataStorage: IDataStorage): Promise<CredentialWallet> {
+  const resolvers = new CredentialStatusResolverRegistry();
+  resolvers.register(CredentialStatusType.SparseMerkleTreeProof, new IssuerResolver());
+  resolvers.register(
+    CredentialStatusType.Iden3ReverseSparseMerkleTreeProof,
+    new RHSResolver(dataStorage.states),
+  );
+  resolvers.register(
+    CredentialStatusType.Iden3OnchainSparseMerkleTreeProof2023,
+    new OnChainResolver([defaultEthConnectionConfig]),
+  );
+  resolvers.register(CredentialStatusType.Iden3commRevocationStatusV1, new AgentResolver());
+
+  return new CredentialWallet(dataStorage, resolvers);
+}
+
+export async function initCircuitStorage(): Promise<ICircuitStorage> {
+  return new FSCircuitStorage({
+    dirname: path.join(__dirname, "../../circuits"),
+  });
+}
+
+export async function initIdentityWallet(
+  dataStorage: IDataStorage,
+  credentialWallet: ICredentialWallet,
+  keyStore: AbstractPrivateKeyStore,
+): Promise<IIdentityWallet> {
+  const bjjProvider = new BjjProvider(KmsKeyType.BabyJubJub, keyStore);
+  const kms = new KMS();
+  kms.registerKeyProvider(KmsKeyType.BabyJubJub, bjjProvider);
+
+  const credentialStatusPublisherRegistry = new CredentialStatusPublisherRegistry();
+  credentialStatusPublisherRegistry.register(
+    CredentialStatusType.Iden3ReverseSparseMerkleTreeProof,
+    new Iden3SmtRhsCredentialStatusPublisher(),
+  );
+
+  return new IdentityWallet(kms, dataStorage, credentialWallet, {
+    credentialStatusPublisherRegistry,
+  });
+}
+
+export async function initProofService(
+  identityWallet: IIdentityWallet,
+  credentialWallet: ICredentialWallet,
+  stateStorage: IStateStorage,
+  circuitStorage: ICircuitStorage,
+): Promise<ProofService> {
+  return new ProofService(identityWallet, credentialWallet, circuitStorage, stateStorage, {
+    ipfsGatewayURL: "https://ipfs.io",
+  });
+}
+
+function createKYCAgeCredential(did: core.DID) {
+  const credentialRequest: CredentialRequest = {
+    credentialSchema:
+      "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json/KYCAgeCredential-v3.json",
+    type: "KYCAgeCredential",
+    credentialSubject: {
+      id: did.string(),
+      birthday: 19960424,
+      documentType: 99,
+    },
+    expiration: 12345678888,
+    revocationOpts: {
+      type: CredentialStatusType.Iden3ReverseSparseMerkleTreeProof,
+      id: "https://rhs-staging.polygonid.me",
+    },
+  };
+  return credentialRequest;
+}
